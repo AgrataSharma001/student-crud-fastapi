@@ -9,6 +9,11 @@ from collections.abc import Iterator
 DATABASE_PATH = Path(__file__).resolve().parent.parent / "data" / "students.db"
 
 
+def get_database_path() -> Path:
+    """Supply the database location; tests can override this FastAPI dependency."""
+    return DATABASE_PATH
+
+
 @contextmanager
 def get_connection(database_path: Path = DATABASE_PATH) -> Iterator[sqlite3.Connection]:
     """Commit successful work, roll back failures, and always close the connection."""
