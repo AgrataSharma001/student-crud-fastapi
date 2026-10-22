@@ -5,9 +5,8 @@ Use dummy student information only.
 
 ## Current progress
 
-Stage 3: student schemas and input validation. SQLite storage and models for
-creating, partially updating, and returning students are ready. The application
-still provides only the welcome endpoint; student endpoints come in Stage 4.
+Stage 4: student CRUD endpoints. Students can be created, listed, filtered,
+viewed, partially updated, and deleted using persistent SQLite storage.
 
 ## Prerequisites
 
@@ -24,11 +23,14 @@ student-crud-fastapi/
     main.py           # Creates the FastAPI application
     database.py       # SQLite connections and student table initialization
     schemas.py        # Student create, partial update, and response models
+    routers/
+      students.py     # Student CRUD endpoints
   data/
     .gitkeep          # Keeps this empty folder in Git
   .gitignore          # Excludes local files and secrets
   requirements.txt   # Required Python packages
-  tests/             # Database and schema checks with Python's unittest
+  requirements-dev.txt # Runtime packages plus the HTTP test client
+  tests/             # Database, schema, and endpoint checks
   README.md           # Setup and usage instructions
 ```
 
@@ -88,7 +90,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/"
 
 Open <http://127.0.0.1:8000/docs> to see FastAPI's interactive API documentation.
 Expand `GET /`, select **Try it out**, and select **Execute**. Expect HTTP 200
-and the same JSON response. Student endpoints do not exist yet.
+and the same JSON response. The **Students** section contains the CRUD endpoints.
 
 ## Verify Stage 2 storage
 
@@ -110,10 +112,11 @@ with get_connection() as db:
 '@ | .\.venv\Scripts\python.exe -
 ```
 
-Run the database and schema checks (these use temporary databases, leaving local
+Run the database, schema, and endpoint checks (these use temporary databases, leaving local
 data alone):
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m unittest discover -v
 ```
 
@@ -135,7 +138,7 @@ fractional numbers are rejected. Unknown input fields and client-supplied `id`
 or `created_at` values are rejected. Email uniqueness is enforced by SQLite,
 since schemas cannot check existing records.
 
-Example create input for the future endpoint:
+Example create input:
 
 ```json
 {"name":"Demo Student","email":"demo@example.com","age":20,"course":"Computer Science"}
@@ -147,12 +150,46 @@ Example partial update input:
 {"course":"Mathematics"}
 ```
 
-These models will appear in the API documentation when student endpoints are
-connected in Stage 4.
+These models appear in the interactive API documentation at `/docs`.
+
+## Stage 4 endpoints
+
+| Method | Path | Result |
+| --- | --- | --- |
+| POST | `/students` | Create a student (201) |
+| GET | `/students` | List students ordered by ID (200) |
+| GET | `/students/{student_id}` | View one student (200) |
+| PATCH | `/students/{student_id}` | Update supplied fields (200) |
+| DELETE | `/students/{student_id}` | Delete a student (204, empty body) |
+
+List parameters: `name` searches a literal substring; `course` matches an exact
+course. Both ignore ASCII case and can be combined. `limit` defaults to 100 and
+must be 1-100; `offset` defaults to 0 and must be nonnegative. For example:
+`/students?name=demo&course=Computer%20Science&limit=10&offset=0`.
+
+Missing students return 404, duplicate emails return 409, and invalid input
+returns 422. Email uniqueness follows SQLite's case-sensitive text comparison
+after Pydantic email normalization. Updates preserve omitted fields. IDs and
+timestamps are assigned by the database.
+
+With the server running, create and update a dummy student from PowerShell:
+
+```powershell
+$studentBody = @{
+    name = "Demo Student"
+    email = "demo@example.com"
+    age = 20
+    course = "Computer Science"
+} | ConvertTo-Json
+$student = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/students" -ContentType "application/json" -Body $studentBody
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/students/$($student.id)"
+$changes = @{ course = "Mathematics" } | ConvertTo-Json
+Invoke-RestMethod -Method Patch -Uri "http://127.0.0.1:8000/students/$($student.id)" -ContentType "application/json" -Body $changes
+Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8000/students/$($student.id)"
+```
 
 ## Next stages
 
-4. Create, list, filter, view, update, and delete endpoints.
 5. Endpoint tests, validation checks, and persistence verification.
 6. Complete API examples and documentation.
 7. GitHub submission preparation.
