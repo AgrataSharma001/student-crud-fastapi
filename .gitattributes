@@ -1,0 +1,5 @@
+# Normalize text in Git while allowing platform-native working-tree endings.
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf

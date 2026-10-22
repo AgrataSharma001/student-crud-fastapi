@@ -15,7 +15,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Student Database CRUD API", lifespan=lifespan)
+app = FastAPI(
+    title="Student Database CRUD API",
+    description=(
+        "A learning project for managing dummy student records with SQLite. "
+        "Create, list, filter, view, partially update, and delete students. "
+        "Student IDs and timestamps are assigned by the database."
+    ),
+    lifespan=lifespan,
+)
 app.include_router(students_router)
 
 

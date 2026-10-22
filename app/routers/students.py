@@ -13,6 +13,14 @@ from app.schemas import StudentCreate, StudentResponse, StudentUpdate
 router = APIRouter(prefix="/students", tags=["Students"])
 DatabasePath = Annotated[Path, Depends(get_database_path)]
 StudentId = Annotated[int, PathParam(gt=0, le=2**63 - 1)]
+NOT_FOUND = {
+    "description": "No student exists with this ID.",
+    "content": {"application/json": {"example": {"detail": "Student not found"}}},
+}
+EMAIL_CONFLICT = {
+    "description": "Another student already uses this email.",
+    "content": {"application/json": {"example": {"detail": "Email is already registered"}}},
+}
 
 
 def require_student(connection: sqlite3.Connection, student_id: int) -> dict:
@@ -28,8 +36,10 @@ def handle_integrity_error(error: sqlite3.IntegrityError) -> None:
     raise error
 
 
-@router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED,
+             responses={409: EMAIL_CONFLICT})
 def create_student(student: StudentCreate, database_path: DatabasePath):
+    """Create a student. All four fields are required; extra fields are rejected."""
     try:
         with get_connection(database_path) as connection:
             cursor = connection.execute(
@@ -45,12 +55,12 @@ def create_student(student: StudentCreate, database_path: DatabasePath):
 @router.get("", response_model=list[StudentResponse])
 def list_students(
     database_path: DatabasePath,
-    name: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
-    course: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 100,
-    offset: Annotated[int, Query(ge=0, le=2**63 - 1)] = 0,
+    name: Annotated[str | None, Query(min_length=1, max_length=100, description="Literal name substring; ignores ASCII case.")] = None,
+    course: Annotated[str | None, Query(min_length=1, max_length=100, description="Exact course match; ignores ASCII case.")] = None,
+    limit: Annotated[int, Query(ge=1, le=100, description="Maximum number of students to return.")] = 100,
+    offset: Annotated[int, Query(ge=0, le=2**63 - 1, description="Number of matching students to skip.")] = 0,
 ):
-    """Filter by a name substring and/or exact course, ignoring ASCII case."""
+    """Return an array ordered by ID. Filters combine with AND; no matches return []."""
     conditions = []
     parameters = []
     if name is not None:
@@ -68,14 +78,17 @@ def list_students(
     return [dict(row) for row in rows]
 
 
-@router.get("/{student_id}", response_model=StudentResponse)
+@router.get("/{student_id}", response_model=StudentResponse, responses={404: NOT_FOUND})
 def get_student(student_id: StudentId, database_path: DatabasePath):
+    """Return one student, including the database-generated ID and creation time."""
     with get_connection(database_path) as connection:
         return require_student(connection, student_id)
 
 
-@router.patch("/{student_id}", response_model=StudentResponse)
+@router.patch("/{student_id}", response_model=StudentResponse,
+              responses={404: NOT_FOUND, 409: EMAIL_CONFLICT})
 def update_student(student_id: StudentId, student: StudentUpdate, database_path: DatabasePath):
+    """Update supplied fields only. Send at least one field; nulls are rejected."""
     changes = student.model_dump(exclude_unset=True)
     # Column names come only from the validated schema; values stay parameterized.
     assignments = ", ".join(f"{column} = ?" for column in changes)
@@ -93,8 +106,10 @@ def update_student(student_id: StudentId, student: StudentUpdate, database_path:
     return result
 
 
-@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT,
+               responses={404: NOT_FOUND})
 def delete_student(student_id: StudentId, database_path: DatabasePath):
+    """Delete one student. Success has an empty body; repeating deletion returns 404."""
     with get_connection(database_path) as connection:
         cursor = connection.execute("DELETE FROM students WHERE id = ?", (student_id,))
         if cursor.rowcount == 0:

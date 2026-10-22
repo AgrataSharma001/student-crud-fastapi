@@ -5,9 +5,10 @@ Use dummy student information only.
 
 ## Current progress
 
-Stage 5: endpoint validation and persistence verification. The student CRUD API
-has automated checks for invalid requests, transaction rollback, and committed
-changes surviving application restarts in separate Python processes.
+Stage 7: GitHub submission preparation. The student CRUD API includes an
+[API reference](docs/API.md), a runnable walkthrough, and a
+[submission guide](docs/SUBMISSION.md) with review, commit, push, and fresh-clone
+verification steps. Automated tests cover validation and persistence.
 
 ## Prerequisites
 
@@ -32,6 +33,9 @@ student-crud-fastapi/
   requirements.txt   # Required Python packages
   requirements-dev.txt # Runtime packages plus the HTTP test client
   tests/             # Database, schema, and endpoint checks
+  docs/API.md        # Complete endpoint and error reference
+  docs/SUBMISSION.md # GitHub submission and fresh-clone checklist
+  examples/demo.py   # Runnable CRUD walkthrough using dummy data
   README.md           # Setup and usage instructions
 ```
 
@@ -92,6 +96,17 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/"
 Open <http://127.0.0.1:8000/docs> to see FastAPI's interactive API documentation.
 Expand `GET /`, select **Try it out**, and select **Execute**. Expect HTTP 200
 and the same JSON response. The **Students** section contains the CRUD endpoints.
+
+See the [API reference](docs/API.md) for all fields, filters, responses, and error
+examples. With the server running, execute the complete walkthrough in a second
+PowerShell window:
+
+```powershell
+.\.venv\Scripts\python.exe examples/demo.py
+```
+
+It creates a unique dummy student, demonstrates CRUD and common errors, and
+deletes the created record afterward. It uses the running server's database.
 
 ## Verify Stage 2 storage
 
@@ -215,8 +230,6 @@ All automated database checks use temporary files. They do not write to
 
 ## Next stages
 
-6. Complete API examples and documentation.
-7. GitHub submission preparation.
 8. Trainer demonstration preparation.
 
 The core build does not include a frontend, authentication, deployment, or AI.

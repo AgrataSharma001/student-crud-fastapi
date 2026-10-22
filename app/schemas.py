@@ -23,7 +23,13 @@ StudentAge = Annotated[int, Field(strict=True, gt=0, le=2**63 - 1)]
 class StudentCreate(BaseModel):
     """All student fields are required when creating a record."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{
+            "name": "Demo Student", "email": "demo@example.com",
+            "age": 20, "course": "Computer Science",
+        }]},
+    )
 
     name: StudentName
     email: EmailStr
@@ -34,7 +40,10 @@ class StudentCreate(BaseModel):
 class StudentUpdate(BaseModel):
     """Partial update: omitted fields stay unchanged; explicit nulls are invalid."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"course": "Mathematics"}]},
+    )
 
     name: StudentName | None = None
     email: EmailStr | None = None
@@ -57,6 +66,11 @@ class StudentUpdate(BaseModel):
 
 class StudentResponse(StudentCreate):
     """A stored student, including the database-generated fields."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{
+        "id": 1, "name": "Demo Student", "email": "demo@example.com",
+        "age": 20, "course": "Computer Science", "created_at": "2026-10-22T12:00:00",
+    }]})
 
     id: Annotated[int, Field(strict=True, gt=0)]
     created_at: datetime
