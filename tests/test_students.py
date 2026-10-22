@@ -110,6 +110,64 @@ class StudentEndpointTests(unittest.TestCase):
         self.assertEqual(set(schema["paths"]["/students"]), {"get", "post"})
         self.assertEqual(set(schema["paths"]["/students/{student_id}"]), {"get", "patch", "delete"})
 
+    def test_invalid_create_and_update_leave_storage_unchanged(self):
+        student = self.create()
+        invalid_values = {
+            "name": [None, "", "  ", "a" * 101],
+            "email": [None, "invalid", ""],
+            "age": [None, 0, -1, True, 20.5, "20", 2**63],
+            "course": [None, "", "  ", "a" * 101],
+        }
+        for field, values in invalid_values.items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    response = self.client.post("/students", json={**self.student, field: value})
+                    self.assertEqual(response.status_code, 422, response.text)
+                    response = self.client.patch(
+                        f"/students/{student['id']}", json={"name": "Changed", field: value}
+                    )
+                    self.assertEqual(response.status_code, 422, response.text)
+                    self.assertEqual(self.client.get("/students").json(), [student])
+
+    def test_malformed_and_non_object_bodies_are_rejected(self):
+        student = self.create()
+        for method, url in [("post", "/students"), ("patch", f"/students/{student['id']}")]:
+            for body in ["{", "null", "[]", '"text"', "20"]:
+                with self.subTest(method=method, body=body):
+                    response = getattr(self.client, method)(
+                        url, content=body, headers={"Content-Type": "application/json"}
+                    )
+                    self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.client.get("/students").json(), [student])
+
+    def test_all_id_routes_and_list_parameter_boundaries(self):
+        for method, kwargs in [("get", {}), ("patch", {"json": {"age": 21}}), ("delete", {})]:
+            for identifier in ["0", "-1", "abc", str(2**63)]:
+                with self.subTest(method=method, identifier=identifier):
+                    response = getattr(self.client, method)(f"/students/{identifier}", **kwargs)
+                    self.assertEqual(response.status_code, 422, response.text)
+        for params in [{"limit": "abc"}, {"offset": "abc"}, {"name": "a" * 101}, {"course": ""}, {"course": "a" * 101}]:
+            with self.subTest(params=params):
+                response = self.client.get("/students", params=params)
+                self.assertEqual(response.status_code, 422, response.text)
+
+    def test_text_is_stored_and_filtered_literally(self):
+        student = self.create(name="O'Brien 100%_", course="Art's %_ Lab")
+        for params in [{"name": "O'Brien"}, {"name": "%_"}, {"course": "Art's %_ Lab"}]:
+            with self.subTest(params=params):
+                self.assertEqual(self.client.get("/students", params=params).json(), [student])
+        self.assertEqual(self.client.get("/students", params={"course": "Art"}).json(), [])
+        self.assertEqual(self.client.get("/students", params={"course": "' OR 1=1 --"}).json(), [])
+
+    def test_valid_boundaries_and_all_fields_update(self):
+        student = self.create(name="a" * 100, course="b" * 100, age=1)
+        changes = {"name": " Updated ", "email": "updated@example.com", "age": 2**63 - 1, "course": " Mathematics "}
+        response = self.client.patch(f"/students/{student['id']}", json=changes)
+        self.assertEqual(response.status_code, 200, response.text)
+        expected = {**student, **changes, "name": "Updated", "course": "Mathematics"}
+        self.assertEqual(response.json(), expected)
+        self.assertEqual(self.client.get(f"/students/{student['id']}").json(), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,26 @@ class DatabaseTests(unittest.TestCase):
                 with get_connection(self.path) as connection:
                     self.insert_student(connection, age=age)
 
+    def test_unexpected_exception_rolls_back_and_closes_connection(self):
+        with self.assertRaisesRegex(RuntimeError, "interrupted"):
+            with get_connection(self.path) as connection:
+                self.insert_student(connection)
+                raise RuntimeError("interrupted")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
+        with get_connection(self.path) as reopened:
+            count = reopened.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_successful_connection_is_closed_after_commit(self):
+        with get_connection(self.path) as connection:
+            self.insert_student(connection)
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
+        with get_connection(self.path) as reopened:
+            count = reopened.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+        self.assertEqual(count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

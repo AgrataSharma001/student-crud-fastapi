@@ -34,7 +34,7 @@ class StudentSchemaTests(unittest.TestCase):
         invalid_values = {
             "name": [None, "", "   ", "a" * 101],
             "email": [None, "", "not-an-email"],
-            "age": [None, 0, -1, True, 20.5, "20"],
+            "age": [None, 0, -1, True, 20.5, "20", 2**63],
             "course": [None, "", "   ", "a" * 101],
         }
         for field, values in invalid_values.items():
