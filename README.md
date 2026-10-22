@@ -5,9 +5,9 @@ Use dummy student information only.
 
 ## Current progress
 
-Stage 2: SQLite storage. The application creates a persistent student database
-at startup and provides a welcome endpoint. Student operations will be added in
-later stages.
+Stage 3: student schemas and input validation. SQLite storage and models for
+creating, partially updating, and returning students are ready. The application
+still provides only the welcome endpoint; student endpoints come in Stage 4.
 
 ## Prerequisites
 
@@ -23,11 +23,12 @@ student-crud-fastapi/
     __init__.py       # Makes app a Python package
     main.py           # Creates the FastAPI application
     database.py       # SQLite connections and student table initialization
+    schemas.py        # Student create, partial update, and response models
   data/
     .gitkeep          # Keeps this empty folder in Git
   .gitignore          # Excludes local files and secrets
   requirements.txt   # Required Python packages
-  tests/             # Database verification with Python's unittest
+  tests/             # Database and schema checks with Python's unittest
   README.md           # Setup and usage instructions
 ```
 
@@ -94,8 +95,7 @@ and the same JSON response. Student endpoints do not exist yet.
 Starting the server automatically creates `data/students.db` and the `students`
 table if they do not exist. Restarting the server preserves existing records.
 The table contains `id`, `name`, unique `email`, positive `age`, `course`, and an
-automatically assigned UTC `created_at` timestamp. Later stages will add API
-schemas and validation for student input.
+automatically assigned UTC `created_at` timestamp.
 
 Database connections commit successful transactions, roll back failed ones, and
 close after use. To inspect the table after starting the server:
@@ -110,15 +110,48 @@ with get_connection() as db:
 '@ | .\.venv\Scripts\python.exe -
 ```
 
-Run the database checks (these use temporary databases, leaving local data alone):
+Run the database and schema checks (these use temporary databases, leaving local
+data alone):
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -v
 ```
 
+## Stage 3 schemas
+
+`app/schemas.py` defines three Pydantic models:
+
+- `StudentCreate`: requires `name`, `email`, `age`, and `course`.
+- `StudentUpdate`: accepts any nonempty subset of those fields. Omitted fields
+  stay unchanged; explicit `null` values are rejected. Use
+  `model_dump(exclude_unset=True)` to obtain only the supplied changes.
+- `StudentResponse`: includes all student fields plus a positive `id` and a
+  `created_at` datetime. Convert SQLite rows with
+  `StudentResponse.model_validate(dict(row))`.
+
+Names and courses are trimmed and must contain 1–100 characters. Email addresses
+must have valid syntax. Age must be a positive integer; strings, booleans, and
+fractional numbers are rejected. Unknown input fields and client-supplied `id`
+or `created_at` values are rejected. Email uniqueness is enforced by SQLite,
+since schemas cannot check existing records.
+
+Example create input for the future endpoint:
+
+```json
+{"name":"Demo Student","email":"demo@example.com","age":20,"course":"Computer Science"}
+```
+
+Example partial update input:
+
+```json
+{"course":"Mathematics"}
+```
+
+These models will appear in the API documentation when student endpoints are
+connected in Stage 4.
+
 ## Next stages
 
-3. Create, update, and response schemas with input validation.
 4. Create, list, filter, view, update, and delete endpoints.
 5. Endpoint tests, validation checks, and persistence verification.
 6. Complete API examples and documentation.
