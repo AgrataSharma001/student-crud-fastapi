@@ -16,7 +16,8 @@ from pydantic import (
 
 StudentName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 CourseName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-StudentAge = Annotated[int, Field(strict=True, gt=0)]
+# Match SQLite's signed 64-bit INTEGER range before values reach the database.
+StudentAge = Annotated[int, Field(strict=True, gt=0, le=2**63 - 1)]
 
 
 class StudentCreate(BaseModel):

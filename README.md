@@ -5,8 +5,9 @@ Use dummy student information only.
 
 ## Current progress
 
-Stage 4: student CRUD endpoints. Students can be created, listed, filtered,
-viewed, partially updated, and deleted using persistent SQLite storage.
+Stage 5: endpoint validation and persistence verification. The student CRUD API
+has automated checks for invalid requests, transaction rollback, and committed
+changes surviving application restarts in separate Python processes.
 
 ## Prerequisites
 
@@ -133,7 +134,8 @@ data alone):
   `StudentResponse.model_validate(dict(row))`.
 
 Names and courses are trimmed and must contain 1–100 characters. Email addresses
-must have valid syntax. Age must be a positive integer; strings, booleans, and
+must have valid syntax. Age must be a positive integer within SQLite's signed
+64-bit range (at most 9223372036854775807); strings, booleans, and
 fractional numbers are rejected. Unknown input fields and client-supplied `id`
 or `created_at` values are rejected. Email uniqueness is enforced by SQLite,
 since schemas cannot check existing records.
@@ -188,9 +190,31 @@ Invoke-RestMethod -Method Patch -Uri "http://127.0.0.1:8000/students/$($student.
 Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8000/students/$($student.id)"
 ```
 
+## Stage 5 verification
+
+The full suite runs with `python -m unittest discover -v` using the project
+virtual environment and development dependencies shown above. Checks cover:
+
+- Student creation, filtering, pagination, partial updates, and deletion.
+- Missing records, duplicate emails, and failed writes leaving records intact.
+- Missing, null, blank, oversized, and incorrectly typed input; malformed JSON;
+  invalid IDs and query parameters. Invalid requests return 422.
+- Literal apostrophes, SQL fragments, and wildcard characters in stored text
+  and filters.
+- Transaction commit, rollback, and connection cleanup.
+- Create, update, conflict rollback, and deletion across five separate Python
+  processes, each starting and stopping the application with the same temporary
+  SQLite file. IDs, timestamps, and unchanged records are preserved.
+
+All automated database checks use temporary files. They do not write to
+`data/students.db`. Run the persistence check alone with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_persistence -v
+```
+
 ## Next stages
 
-5. Endpoint tests, validation checks, and persistence verification.
 6. Complete API examples and documentation.
 7. GitHub submission preparation.
 8. Trainer demonstration preparation.
